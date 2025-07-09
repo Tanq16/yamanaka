@@ -6,10 +6,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"yamanaka/api"
-	"time" // Added for ticker
-	"yamanaka/state"
-	"yamanaka/vault"
+	"time"
+
+	"github.com/tanq16/yamanaka/server/api"
+	"github.com/tanq16/yamanaka/server/state"
+	"github.com/tanq16/yamanaka/server/vault"
 )
 
 const (

@@ -3,7 +3,8 @@ package state
 import (
 	"log"
 	"sync"
-	"yamanaka/events" // Import for event structures
+
+	"github.com/tanq16/yamanaka/server/events"
 )
 
 // Manager holds the state of all connected clients for SSE.

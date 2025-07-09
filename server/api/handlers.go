@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	// "path/filepath" // No longer needed directly here for VaultPath manipulation in some handlers
-	"yamanaka/events" // Import for event structures
-	"yamanaka/state"
-	"yamanaka/vault"
+
+	"github.com/tanq16/yamanaka/server/events"
+	"github.com/tanq16/yamanaka/server/state"
+	"github.com/tanq16/yamanaka/server/vault"
 )
 
 // ApiHandler holds dependencies for our handlers.
@@ -53,7 +53,7 @@ type PushRequest struct {
 // CheckHandler compares the client's hash with the server's latest git hash.
 func (h *ApiHandler) CheckHandler(w http.ResponseWriter, r *http.Request) {
 	// clientHash := r.URL.Query().Get("current_hash") // Client hash comparison is removed
-	
+
 	// This handler's utility is significantly reduced with Git-decoupled sync.
 	// For now, it just confirms the server is alive.
 	// Clients will rely on SSE for real-time updates and `/api/sync/pull` for full state.
@@ -155,7 +155,6 @@ func (h *ApiHandler) PushHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(SuccessResponse{Status: "success, push processed and changes broadcasted"})
 }
 
-
 // PullHandler sends the entire current state of the vault to the client.
 func (h *ApiHandler) PullHandler(w http.ResponseWriter, r *http.Request) {
 	// currentHash, err := vault.GetCurrentHash(h.VaultPath) // Git hash is no longer sent
@@ -176,7 +175,6 @@ func (h *ApiHandler) PullHandler(w http.ResponseWriter, r *http.Request) {
 		Files: files,
 	})
 }
-
 
 // EventsHandler manages Server-Sent Events (SSE) for real-time updates.
 func (h *ApiHandler) EventsHandler(w http.ResponseWriter, r *http.Request) {
@@ -247,7 +245,7 @@ func (h *ApiHandler) EventsHandler(w http.ResponseWriter, r *http.Request) {
 						eventName = events.SSEEventFileDeleted
 					}
 					jsonData, err = json.Marshal(specificEvent)
-
+				}
 				// How PushHandler signals create vs update for FileEventData:
 				// Option 1: PushHandler sends different types (e.g. `events.FileCreatedData`, `events.FileUpdatedData`). Manager broadcasts `interface{}`. EventsHandler type switches.
 				// Option 2: FileEventData gets an `Action` field: "create", "update", "delete".
@@ -277,4 +275,3 @@ func (h *ApiHandler) EventsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
-

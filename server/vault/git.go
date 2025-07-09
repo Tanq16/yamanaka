@@ -6,7 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"yamanaka/state" // Import for FileSystemMutex
+
+	"github.com/tanq16/yamanaka/server/state"
 )
 
 // InitRepo initializes a new git repository in the given path if one doesn't exist.
@@ -30,7 +31,7 @@ func GetCurrentHash(vaultPath string) (string, error) {
 	if err != nil {
 		// This can happen in a new repo with no commits yet. Return an empty hash.
 		if _, ok := err.(*exec.ExitError); ok {
-			return "", nil 
+			return "", nil
 		}
 		return "", fmt.Errorf("failed to get current hash: %w", err)
 	}
@@ -80,4 +81,3 @@ func CommitChanges(vaultPath, message string) (string, error) {
 	// Return the new hash
 	return GetCurrentHash(vaultPath)
 }
-

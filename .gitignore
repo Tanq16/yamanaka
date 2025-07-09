@@ -33,3 +33,7 @@ go.work.sum
 
 # Node
 **/node_modules/
+
+# General
+**/*.DS_Store
+data/

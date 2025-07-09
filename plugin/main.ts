@@ -1,4 +1,4 @@
-import { App, Notice, Plugin, TAbstractFile, TFile } from 'obsidian';
+import { App, normalizePath, Notice, Plugin, TAbstractFile, TFile } from 'obsidian';
 import { v4 as uuidv4 } from 'uuid';
 import { ApiClient } from './api/client';
 import { YamanakaSettingTab } from './settings/tab';

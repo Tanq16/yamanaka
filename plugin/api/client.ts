@@ -33,25 +33,60 @@ export class ApiClient {
     private eventSource: EventSource | null = null;
 
     constructor(baseUrl: string) {
-        this.baseUrl = baseUrl;
+        this.baseUrl = this.normalizeBaseUrl(baseUrl);
     }
 
     private async request(endpoint: string, options: RequestInit = {}): Promise<Response> {
         if (!this.baseUrl) {
             throw new Error("Server URL is not configured.");
         }
-        const url = `${this.baseUrl}${endpoint}`;
+        // Ensure endpoint starts with a slash if baseUrl doesn't have one and endpoint is not empty
+        let fullUrl = this.baseUrl;
+        if (endpoint) {
+            if (this.baseUrl.endsWith('/') && endpoint.startsWith('/')) {
+                fullUrl = this.baseUrl + endpoint.substring(1);
+            } else if (!this.baseUrl.endsWith('/') && !endpoint.startsWith('/')) {
+                fullUrl = this.baseUrl + '/' + endpoint;
+            } else {
+                fullUrl = this.baseUrl + endpoint;
+            }
+        }
+
+        console.log(`[Yamanaka] Making request to: ${fullUrl}`); // Added for debugging
+
         try {
-            return await fetch(url, options);
+            // Obsidian's fetch requires a proper scheme for external requests.
+            // The `this.baseUrl` should already be normalized by constructor or updateBaseUrl.
+            return await fetch(fullUrl, options);
         } catch (err) {
-            console.error(`[Yamanaka] Network error for ${url}:`, err);
-            throw new Error(`Failed to connect to the server at ${this.baseUrl}. Is it running?`);
+            console.error(`[Yamanaka] Network error for ${fullUrl}:`, err);
+            // Check if the error is due to missing scheme (TypeError in browser-like environments)
+            if (err instanceof TypeError && (err.message.includes("Invalid URL") || err.message.includes("Failed to parse URL") || err.message.includes("URL constructor:is not a valid URL."))) {
+                 throw new Error(`Invalid server URL: ${this.baseUrl}. Please ensure it includes a scheme (e.g., http:// or https://).`);
+            }
+            throw new Error(`Failed to connect to the server at ${this.baseUrl}. Is it running? Error: ${err.message}`);
         }
     }
 
+    private normalizeBaseUrl(url: string): string {
+        if (!url) return '';
+        let normalizedUrl = url.trim();
+        if (!normalizedUrl.match(/^https?:\/\//i)) {
+            normalizedUrl = 'http://' + normalizedUrl;
+            console.log(`[Yamanaka] Prepended http:// to base URL. New URL: ${normalizedUrl}`);
+        }
+        // Remove trailing slash for consistency, request method will handle endpoint joining
+        if (normalizedUrl.endsWith('/')) {
+            normalizedUrl = normalizedUrl.slice(0, -1);
+        }
+        return normalizedUrl;
+    }
+
     updateBaseUrl(newUrl: string) {
-        this.baseUrl = newUrl.endsWith('/') ? newUrl.slice(0, -1) : newUrl;
-        this.disconnectFromEvents();
+        this.baseUrl = this.normalizeBaseUrl(newUrl);
+        this.disconnectFromEvents(); // Important to disconnect before potentially connecting to a new URL
+        // Note: Reconnection should be triggered by the caller (e.g., settings tab or main plugin logic)
+        // This is already handled in settings tab: this.plugin.connectToEvents();
     }
 
     async check(deviceId: string /*, currentHash: string // No longer needed */): Promise<CheckResponse> {

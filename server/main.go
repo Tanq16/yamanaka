@@ -106,7 +106,28 @@ func main() {
 
 	// --- 5. Start Server ---
 	log.Printf("Server starting on %s", serverAddr)
-	if err := http.ListenAndServe(serverAddr, mux); err != nil {
+	// Wrap the mux with CORS middleware
+	corsMux := corsMiddleware(mux)
+	if err := http.ListenAndServe(serverAddr, corsMux); err != nil {
 		log.Fatalf("FATAL: Could not start server: %v", err)
 	}
+}
+
+// corsMiddleware wraps an http.Handler with CORS headers
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers
+		w.Header().Set("Access-Control-Allow-Origin", "app://obsidian.md") // Or "*" for testing, but be specific in production
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Requested-With, Origin, Accept, Authorization") // Added Authorization
+
+		// Handle preflight requests
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		// Call the next handler
+		next.ServeHTTP(w, r)
+	})
 }

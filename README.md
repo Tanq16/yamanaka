@@ -66,8 +66,9 @@ graph TD
         COMMIT_OP --> FS
         COMMIT_OP --> GIT
     end
-    Note over Server: This process is independent of client interactions.
 ```
+
+Note: Git operations are independent of plugin operations.
 
 ## Installation
 

@@ -14,42 +14,42 @@ Yamanaka is a self-hosted synchronization solution for your Obsidian.md vault. I
 
 The system consists of two main components:
 
-1.  **Backend Server (Go):**
-    *   Manages the central vault data on its filesystem.
-    *   Initializes a Git repository within its data directory for periodic versioning.
-    *   Exposes an HTTP API for:
-        *   Pushing/pulling file changes.
-        *   Initial vault synchronization.
-        *   Serving Server-Sent Events (SSE) for real-time updates.
-    *   Handles file operations (create, update, delete) from clients.
-    *   Broadcasts granular file change events (path, content for updates/creates, delete notifications) via SSE to all other connected clients.
-    *   A background goroutine performs a `git commit` operation every 6 hours. Git is **not** used for direct client-to-client sync determination.
-
-2.  **Obsidian Plugin (TypeScript):**
-    *   Installed in each Obsidian vault.
-    *   Generates a unique `deviceId`.
-    *   Watches the local vault for file changes (creates, modifications, deletions, renames).
-    *   Pushes local changes to the server's HTTP API.
-    *   Connects to the server's SSE endpoint (`/api/events`) to receive real-time updates about file changes from other clients.
-    *   Applies received SSE events (file updates, deletions) to the local vault.
-    *   Handles full sync requests when indicated by the server (e.g., after another client performs an initial sync).
+1. **Backend Server (Go):**
+    * Manages the central vault data on its filesystem.
+    * Initializes a Git repository within its data directory for periodic versioning.
+    * Exposes an HTTP API for:
+        * Pushing/pulling file changes.
+        * Initial vault synchronization.
+        * Serving Server-Sent Events (SSE) for real-time updates.
+    * Handles file operations (create, update, delete) from clients.
+    * Broadcasts granular file change events (path, content for updates/creates, delete notifications) via SSE to all other connected clients.
+    * A background goroutine performs a `git commit` operation every 6 hours. Git is **not** used for direct client-to-client sync determination.
+2. **Obsidian Plugin (TypeScript):**
+    * Installed in each Obsidian vault.
+    * Generates a unique `deviceId`.
+    * Watches the local vault for file changes (creates, modifications, deletions, renames).
+    * Pushes local changes to the server's HTTP API.
+    * Connects to the server's SSE endpoint (`/api/events`) to receive real-time updates about file changes from other clients.
+    * Applies received SSE events (file updates, deletions) to the local vault.
+    * Handles full sync requests when indicated by the server (e.g., after another client performs an initial sync).
 
 ### Data Flow for Real-time Sync:
 
 ```mermaid
 sequenceDiagram
     participant ClientA as Obsidian Client A
+    participant ObsidianAPI
     participant Server
     participant ClientB as Obsidian Client B
 
-    Note over ClientA, ClientB: Both connected to Server via SSE (/api/events)
+    Note over ClientA,ClientB: Both connected to Server via SSE (/api/events)
 
     ClientA->>+ObsidianAPI: User creates/modifies file "note.md"
-    ObsidianAPI-->>ClientA: Vault event triggered
+    ObsidianAPI-->>-ClientA: Vault event triggered
     ClientA->>+Server: POST /api/sync/push (path: "note.md", content: base64_data)
     Server->>Server: Writes "note.md" to its filesystem
     Server-->>-ClientA: HTTP 200 OK (Push successful)
-    Server->>-ClientB: SSE Event (event: file_updated, data: {path: "note.md", content: base64_data})
+    Server->>ClientB: SSE Event (event: file_updated, data: {path: "note.md", content: base64_data})
 
     ClientB->>+ObsidianAPI: Applies change to local "note.md"
     ObsidianAPI-->>-ClientB: Local vault updated
@@ -61,7 +61,7 @@ sequenceDiagram
 graph TD
     subgraph Server
         FS[File System Vault]
-        GIT[Git Repository (.git)]
+        GIT["Git Repository (.git)"]
         TICKER[6-Hour Ticker] --> COMMIT_OP[Perform Git Commit]
         COMMIT_OP --> FS
         COMMIT_OP --> GIT

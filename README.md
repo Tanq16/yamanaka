@@ -1,0 +1,2 @@
+# yamanaka
+Obsidian Sync Plugin

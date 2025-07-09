@@ -1,20 +1,32 @@
 import { Notice } from 'obsidian';
 
-// API response types from the Go server
+// API response types from the Go server (updated to reflect backend changes)
 interface CheckResponse {
-	status: 'uptodate' | 'new_changes';
-	latest_hash?: string;
+	status: 'ok' | 'error'; // Simplified, hash comparison is removed
+	// latest_hash?: string; // Removed
 }
 
 interface SuccessResponse {
-	status: 'success';
-	new_hash: string;
+	status: string; // e.g., "success, push processed and changes broadcasted"
+	// new_hash: string; // Removed
 }
 
 interface PullResponse {
-	hash: string;
-	files: { path: string; content: string }[];
+	// hash: string; // Removed
+	files: { path: string; content: string }[]; // content is base64
 }
+
+// Event data types from the server for SSE
+export interface FileEventData {
+    path: string;
+    content?: string; // base64 encoded, empty for delete
+    // sender_device_id is not expected here as it's filtered by server/client
+}
+
+export interface FullSyncEventData {
+    message: string;
+}
+
 
 export class ApiClient {
     private baseUrl: string;
@@ -42,9 +54,19 @@ export class ApiClient {
         this.disconnectFromEvents();
     }
 
-    async check(deviceId: string, currentHash: string): Promise<CheckResponse> {
-        const response = await this.request(`/api/check?device_id=${deviceId}&current_hash=${currentHash}`);
-        if (!response.ok) throw new Error(`Server check failed with status ${response.status}`);
+    async check(deviceId: string /*, currentHash: string // No longer needed */): Promise<CheckResponse> {
+        const response = await this.request(`/api/check?device_id=${deviceId}`); // current_hash parameter removed
+        if (!response.ok) {
+            // Try to parse error from server if possible, otherwise generic error
+            let errorMsg = `Server check failed with status ${response.status}`;
+            try {
+                const errorBody = await response.json();
+                if (errorBody && errorBody.error) {
+                    errorMsg = errorBody.error;
+                }
+            } catch(e) { /* ignore parsing error */ }
+            throw new Error(errorMsg);
+        }
         return response.json();
     }
 
@@ -78,11 +100,24 @@ export class ApiClient {
         return response.json();
     }
 
-    connectToEvents(deviceId: string, onNewChanges: (latestHash: string) => void) {
-        if (!this.baseUrl || this.eventSource) {
+    connectToEvents(
+        deviceId: string,
+        onFileUpdated: (data: FileEventData) => void,
+        onFileDeleted: (data: FileEventData) => void,
+        onFullSyncRequired: (data: FullSyncEventData) => void
+    ) {
+        if (!this.baseUrl) {
+            console.warn('[Yamanaka] Base URL not set. Cannot connect to SSE.');
+            new Notice('Yamanaka: Server URL not configured. SSE connection failed.');
             return;
         }
+        if (this.eventSource) {
+            console.log('[Yamanaka] SSE connection already exists or is being established.');
+            return;
+        }
+
         const url = `${this.baseUrl}/api/events?device_id=${deviceId}`;
+        console.log(`[Yamanaka] Attempting to connect to SSE at ${url}`);
         this.eventSource = new EventSource(url);
 
         this.eventSource.onopen = () => {
@@ -90,16 +125,48 @@ export class ApiClient {
             new Notice('Yamanaka: Real-time sync connected.');
         };
 
-        this.eventSource.addEventListener('new_changes', (event) => {
-            const data = JSON.parse(event.data);
-            console.log('[Yamanaka] Received new_changes event with hash:', data.latest_hash);
-            onNewChanges(data.latest_hash);
+        this.eventSource.addEventListener('file_updated', (event: MessageEvent) => {
+            try {
+                const data = JSON.parse(event.data) as FileEventData;
+                console.log('[Yamanaka] SSE file_updated:', data);
+                onFileUpdated(data);
+            } catch (e) {
+                console.error('[Yamanaka] Error parsing file_updated event data:', e, event.data);
+            }
+        });
+
+        this.eventSource.addEventListener('file_deleted', (event: MessageEvent) => {
+            try {
+                const data = JSON.parse(event.data) as FileEventData;
+                console.log('[Yamanaka] SSE file_deleted:', data);
+                onFileDeleted(data);
+            } catch (e) {
+                console.error('[Yamanaka] Error parsing file_deleted event data:', e, event.data);
+            }
+        });
+
+        this.eventSource.addEventListener('full_sync_required', (event: MessageEvent) => {
+            try {
+                const data = JSON.parse(event.data) as FullSyncEventData;
+                console.log('[Yamanaka] SSE full_sync_required:', data);
+                onFullSyncRequired(data);
+            } catch (e) {
+                console.error('[Yamanaka] Error parsing full_sync_required event data:', e, event.data);
+            }
         });
 
         this.eventSource.onerror = (err) => {
             console.error('[Yamanaka] SSE connection error:', err);
-            new Notice('Yamanaka: Real-time sync disconnected. Will try to reconnect.');
-            this.disconnectFromEvents();
+            // EventSource attempts to reconnect automatically by default.
+            // We might want to inform the user after several failed attempts or if it's an immediate closure.
+            if (this.eventSource?.readyState === EventSource.CLOSED) {
+                 new Notice('Yamanaka: Real-time sync disconnected. Check server and settings.');
+            } else {
+                new Notice('Yamanaka: Real-time sync connection issue. Will attempt to reconnect.');
+            }
+            // No need to call disconnectFromEvents() here, as EventSource handles retries.
+            // If retries fail persistently, it will remain in a broken state.
+            // We might want to nullify this.eventSource only on explicit disconnect or unload.
         };
     }
 

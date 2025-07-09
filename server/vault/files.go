@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"yamanaka/state" // Import for FileSystemMutex
 )
 
 // File represents a single file in the vault for API transfer.
@@ -53,6 +54,9 @@ func GetAllFiles(vaultPath string) ([]File, error) {
 
 // CleanDir removes all files and directories from the vault path, except for .git.
 func CleanDir(vaultPath string) error {
+	state.FileSystemMutex.Lock()
+	defer state.FileSystemMutex.Unlock()
+
 	entries, err := os.ReadDir(vaultPath)
 	if err != nil {
 		return err
@@ -70,6 +74,9 @@ func CleanDir(vaultPath string) error {
 
 // ExtractTarGz decompresses a gzipped tar archive into the destination path.
 func ExtractTarGz(gzipStream io.Reader, dst string) error {
+	state.FileSystemMutex.Lock()
+	defer state.FileSystemMutex.Unlock()
+
 	uncompressedStream, err := gzip.NewReader(gzipStream)
 	if err != nil {
 		return err
@@ -119,6 +126,9 @@ func ExtractTarGz(gzipStream io.Reader, dst string) error {
 
 // WriteFile writes content to a specific file path within the vault, creating parent directories if needed.
 func WriteFile(vaultPath, relPath string, content []byte) error {
+	state.FileSystemMutex.Lock()
+	defer state.FileSystemMutex.Unlock()
+
 	fullPath := filepath.Join(vaultPath, relPath)
 	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
 		return err
@@ -128,6 +138,9 @@ func WriteFile(vaultPath, relPath string, content []byte) error {
 
 // DeleteFile removes a file from the vault.
 func DeleteFile(vaultPath, relPath string) error {
+	state.FileSystemMutex.Lock()
+	defer state.FileSystemMutex.Unlock()
+
 	fullPath := filepath.Join(vaultPath, relPath)
 	return os.Remove(fullPath)
 }

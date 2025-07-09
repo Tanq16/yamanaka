@@ -30,10 +30,8 @@ export class SyncManager {
 
     async check() {
         try {
-            return await this.apiClient.check(
-                this.plugin.settings.deviceId,
-                this.plugin.settings.lastSyncHash
-            );
+            // lastSyncHash is no longer used by the backend's /api/check endpoint
+            return await this.apiClient.check(this.plugin.settings.deviceId);
         } catch (err) {
             new Notice(err.message);
             console.error(err);
@@ -74,8 +72,8 @@ export class SyncManager {
                 }
             }
             
-            this.plugin.settings.lastSyncHash = response.hash;
-            await this.plugin.saveSettings();
+            // this.plugin.settings.lastSyncHash = response.hash; // Hash is removed from PullResponse
+            // await this.plugin.saveSettings(); // No settings change needed here anymore regarding hash
             new Notice("Pull complete!");
 
         } catch (err) {
@@ -105,9 +103,9 @@ export class SyncManager {
                 Array.from(filesToDelete)
             );
 
-            this.plugin.settings.lastSyncHash = response.new_hash;
-            await this.plugin.saveSettings();
-            new Notice("Push successful!");
+            // this.plugin.settings.lastSyncHash = response.new_hash; // new_hash is removed from SuccessResponse for push
+            // await this.plugin.saveSettings(); // No settings change needed here anymore regarding hash
+            new Notice(`Push successful! Server response: ${response.status}`);
 
         } catch (err) {
             new Notice(`Push failed: ${err.message}`);
@@ -138,9 +136,9 @@ export class SyncManager {
             new Notice(`Archived ${fileCount} files. Uploading to server...`);
 
             const response = await this.apiClient.initialSync(this.plugin.settings.deviceId, blob);
-            this.plugin.settings.lastSyncHash = response.new_hash;
-            await this.plugin.saveSettings();
-            new Notice("Initial Sync successful!");
+            // this.plugin.settings.lastSyncHash = response.new_hash; // new_hash is removed from SuccessResponse for initialSync
+            // await this.plugin.saveSettings(); // No settings change needed here anymore regarding hash
+            new Notice(`Initial Sync successful! Server response: ${response.status}`);
 
         } catch (err) {
             new Notice(`Initial Sync failed: ${err.message}`);

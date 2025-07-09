@@ -7,14 +7,50 @@ import (
 	"path/filepath"
 
 	"yamanaka/api"
+	"time" // Added for ticker
 	"yamanaka/state"
 	"yamanaka/vault"
 )
 
 const (
-	dataDir    = "./data"
-	serverAddr = ":8080"
+	dataDir              = "./data"
+	serverAddr           = ":8080"
+	gitCommitInterval    = 6 * time.Hour
+	periodicCommitUserID = "server_periodic_commit"
 )
+
+// startPeriodicGitCommits starts a goroutine that periodically commits changes in the vault.
+func startPeriodicGitCommits(vaultPath string, sm *state.Manager) {
+	log.Printf("Starting periodic Git committer. Interval: %v", gitCommitInterval)
+	ticker := time.NewTicker(gitCommitInterval)
+	go func() {
+		for range ticker.C {
+			log.Println("Periodic Git committer: Attempting to commit changes...")
+			commitMsg := "Automatic periodic server commit"
+			newHash, err := vault.CommitChanges(vaultPath, commitMsg)
+			if err != nil {
+				log.Printf("ERROR: Periodic Git committer: Failed to commit changes: %v", err)
+				continue // Continue to next tick
+			}
+
+			// Check if the hash actually changed (i.e., if there were any new changes)
+			// We need a way to get the hash *before* this commit attempt to compare.
+			// For simplicity, CommitChanges now returns the current hash even if nothing was committed.
+			// So, we broadcast only if the process of committing (even if it results in the same hash) is considered an event.
+			// Or, more robustly, CommitChanges could return a boolean indicating if a *new* commit was actually made.
+			// For now, we'll assume any call to CommitChanges that doesn't error should result in a broadcast,
+			// as it represents a "settling" of the state.
+
+			// It's important that CommitChanges itself is wrapped in the FileSystemMutex.
+			// And GetCurrentHash is also wrapped if it reads from disk in a way that could race.
+			// GetCurrentHash currently uses git rev-parse HEAD, which should be safe.
+
+			log.Printf("Periodic Git committer: Changes committed. New hash: %s", newHash)
+			// sm.Broadcast(periodicCommitUserID, newHash) // DO NOT broadcast git hash to clients anymore. This is purely a backend operation.
+			// If we need to notify admins or a different system, use a separate mechanism.
+		}
+	}()
+}
 
 func main() {
 	log.Println("Starting Yamanaka Sync Server...")
@@ -49,6 +85,9 @@ func main() {
 	// We create an ApiHandler struct to provide dependencies (like the state manager and vault path)
 	// to our HTTP handler functions. This is a form of dependency injection.
 	apiHandler := api.NewApiHandler(stateManager, vaultPath)
+
+	// --- 3a. Start Periodic Git Commits ---
+	startPeriodicGitCommits(vaultPath, stateManager)
 
 	// --- 4. Define HTTP Routes ---
 	mux := http.NewServeMux()

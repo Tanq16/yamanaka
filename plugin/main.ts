@@ -50,6 +50,46 @@ export default class YamanakaPlugin extends Plugin {
 
 		this.registerVaultEvents();
         this.connectToEvents();
+		this.addPluginCommands();
+	}
+
+	addPluginCommands() {
+		this.addCommand({
+			id: 'yamanaka-manual-push',
+			name: 'Yamanaka: Manual Push',
+			callback: async () => {
+				if (this.syncManager.isSyncing) {
+					new Notice("Sync is already in progress.");
+					return;
+				}
+				if (this.filesToUpdate.size === 0 && this.filesToDelete.size === 0) {
+					new Notice("No local changes to push.");
+					// Optionally, trigger a check here
+					const status = await this.syncManager.check();
+					if (status.status === "new_changes") {
+						new Notice("Server has new changes. Consider pulling first.");
+					}
+					return;
+				}
+				new Notice(`Pushing ${this.filesToUpdate.size} updates and ${this.filesToDelete.size} deletions...`);
+				await this.syncManager.push(this.filesToUpdate, this.filesToDelete);
+				this.filesToUpdate.clear();
+				this.filesToDelete.clear();
+			}
+		});
+
+		this.addCommand({
+			id: 'yamanaka-manual-pull',
+			name: 'Yamanaka: Manual Pull',
+			callback: async () => { // Corrected syntax: async () =>
+				if (this.syncManager.isSyncing) {
+					new Notice("Sync is already in progress.");
+					return;
+				}
+				new Notice("Starting manual pull...");
+				await this.syncManager.pull();
+			}
+		});
 	}
 
     connectToEvents() {

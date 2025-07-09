@@ -11,6 +11,7 @@
     "importHelpers": true,
     "isolatedModules": true,
     "strictNullChecks": true,
+    "esModuleInterop": true, // Added this line
     "lib": [
       "DOM",
       "ES5",

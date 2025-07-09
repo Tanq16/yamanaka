@@ -1,7 +1,7 @@
 import { Notice, TFile, TAbstractFile, normalizePath } from 'obsidian';
 import YamanakaPlugin from '../main';
 import { ApiClient } from '../api/client';
-import * as Tar from 'tar-js';
+import Tar from 'tar-js'; // Changed import style
 import * as pako from 'pako';
 
 export class SyncManager {

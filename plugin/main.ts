@@ -182,8 +182,9 @@ export default class YamanakaPlugin extends Plugin {
     }
 
     handleFullSyncRequiredEvent(data: import('./api/client').FullSyncEventData) {
-        console.log('[Yamanaka] SSE: Received full_sync_required event:', data.message);
-        new Notice(`Yamanaka: Server requires full sync. ${data.message}. Pulling all changes...`);
+        console.log(`[Yamanaka] SSE: Received full_sync_required event: ${data.message}. Initiating pull.`);
+        // Notice removed from here, as syncManager.pull() will provide its own notices
+        // regarding the success or failure of the pull operation.
         this.syncManager.pull(); // This will pull all files
     }
 

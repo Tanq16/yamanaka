@@ -33,7 +33,7 @@ esbuild.build({
         "@lezer/lr",
         ...builtins],
     format: "cjs",
-    watch: !prod,
+    // watch: !prod, // Removed for now to debug build error
     target: "es2018",
     logLevel: "info",
     sourcemap: prod ? false : "inline",

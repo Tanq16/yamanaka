@@ -19,6 +19,20 @@ func InitRepo(vaultPath string) error {
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to run 'git init': %w", err)
 		}
+
+		// Set user name and email for this specific repository
+		// This is good practice even if global settings are expected to be present
+		configUserNameCmd := exec.Command("git", "config", "user.name", "yamanaka")
+		configUserNameCmd.Dir = vaultPath
+		if err := configUserNameCmd.Run(); err != nil {
+			return fmt.Errorf("failed to set git config user.name: %w", err)
+		}
+
+		configUserEmailCmd := exec.Command("git", "config", "user.email", "yamanaka@obsidian.sync")
+		configUserEmailCmd.Dir = vaultPath
+		if err := configUserEmailCmd.Run(); err != nil {
+			return fmt.Errorf("failed to set git config user.email: %w", err)
+		}
 	}
 	return nil
 }

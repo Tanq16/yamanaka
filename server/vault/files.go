@@ -21,7 +21,11 @@ type File struct {
 
 // GetAllFiles walks the vault directory and returns a slice of all files.
 // It skips the .git directory.
+// This function uses a read lock to ensure consistency while reading files.
 func GetAllFiles(vaultPath string) ([]File, error) {
+	state.FileSystemMutex.RLock()
+	defer state.FileSystemMutex.RUnlock()
+
 	var files []File
 	err := filepath.Walk(vaultPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {

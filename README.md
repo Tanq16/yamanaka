@@ -128,7 +128,3 @@ sequenceDiagram
 ## Contributing
 
 As mentioned earlier, this is an AI-experiment repository. That said, since the plugin works properly, contributions are welcome and I will manually review and merge going forward. Please note, unlike most projects, this is meant to be an application that works only for myself, but if someone gets aid from it, that's great. Hence, the MIT license to support freedom. Feature additions, bug fixes, and meaningful contributions are welcome. If you want to discuss, feel free to open an issue and I'll be happy to discuss.
-
-## License
-
-[MIT License](LICENSE).

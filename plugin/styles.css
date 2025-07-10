@@ -10,3 +10,15 @@
     font-size: var(--font-ui-small);
     color: var(--text-muted);
 }
+
+/* Custom yellow warning button */
+button.yamanaka-custom-warning-yellow {
+    background-color: var(--color-yellow, #f1c40f); /* Obsidian's yellow or fallback */
+    color: black; /* Ensuring text readability on yellow */
+    border: 1px solid var(--color-orange, #e67e22); /* A slightly darker border for emphasis */
+}
+
+button.yamanaka-custom-warning-yellow:hover {
+    background-color: var(--color-yellow-hover, #f39c12); /* A darker yellow/orange on hover */
+    color: black;
+}

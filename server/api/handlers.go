@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/tanq16/yamanaka/server/events"
 	"github.com/tanq16/yamanaka/server/state"
@@ -217,8 +218,19 @@ func (h *ApiHandler) EventsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Heartbeat ticker
+	heartbeatTicker := time.NewTicker(2 * time.Minute)
+	defer heartbeatTicker.Stop()
+
 	for {
 		select {
+		case <-heartbeatTicker.C:
+			// Send a comment as a heartbeat
+			// SSE comments start with a colon and are ignored by EventSource implementations
+			// but they keep the connection alive.
+			fmt.Fprintf(w, ":heartbeat\n\n")
+			flusher.Flush()
+			log.Printf("Sent heartbeat to client %s", deviceID)
 		case eventMsg := <-eventChan:
 			var eventName string
 			var jsonData []byte

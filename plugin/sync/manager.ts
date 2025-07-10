@@ -39,7 +39,7 @@ export class SyncManager {
         }
     }
 
-    async pull() {
+    async pull(isAutoSync?: boolean) {
         if (!await this.setSyncing(true, 'Syncing: Pulling from server...')) return;
 
         try {
@@ -94,17 +94,21 @@ export class SyncManager {
             
             // this.plugin.settings.lastSyncHash = response.hash; // Hash is removed from PullResponse
             // await this.plugin.saveSettings(); // No settings change needed here anymore regarding hash
-            new Notice("Pull complete!");
+            if (!isAutoSync) {
+                new Notice("Pull complete!");
+            }
 
         } catch (err) {
-            new Notice(`Pull failed: ${err.message}`);
+            if (!isAutoSync) {
+                new Notice(`Pull failed: ${err.message}`);
+            }
             console.error(err);
         } finally {
             await this.setSyncing(false, 'Idle');
         }
     }
 
-    async push(filesToUpdate: Set<string>, filesToDelete: Set<string>) {
+    async push(filesToUpdate: Set<string>, filesToDelete: Set<string>, isAutoSync?: boolean) {
         if (!await this.setSyncing(true, `Syncing: Pushing ${filesToUpdate.size + filesToDelete.size} changes...`)) return;
 
         try {
@@ -125,10 +129,14 @@ export class SyncManager {
 
             // this.plugin.settings.lastSyncHash = response.new_hash; // new_hash is removed from SuccessResponse for push
             // await this.plugin.saveSettings(); // No settings change needed here anymore regarding hash
-            new Notice(`Push successful! Server response: ${response.status}`);
+            if (!isAutoSync) {
+                new Notice(`Push successful! Server response: ${response.status}`);
+            }
 
         } catch (err) {
-            new Notice(`Push failed: ${err.message}`);
+            if (!isAutoSync) {
+                new Notice(`Push failed: ${err.message}`);
+            }
             console.error(err);
         } finally {
             await this.setSyncing(false, 'Idle');

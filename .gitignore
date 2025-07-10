@@ -36,4 +36,4 @@ go.work.sum
 
 # General
 **/*.DS_Store
-data/
+**/data/

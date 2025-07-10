@@ -1,17 +1,27 @@
-# Yamanaka - Self-Hosted Obsidian Sync
+<p align="center">
+<img src=".github/logo.png" alt="Yamanaka Logo" width="250" />
+</p>
+<h1 align="center">Yamanaka</h1>
+<p align="center">
+<a href="https://github.com/tanq16/yamanaka/actions/workflows/release.yml"><img src="https://github.com/tanq16/yamanaka/actions/workflows/release.yml/badge.svg" alt="Release"></a>&nbsp;<a href="https://github.com/tanq16/yamanaka/releases"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/tanq16/yamanaka"></a>&nbsp;<a href="https://hub.docker.com/r/tanq16/yamanaka"><img src="https://img.shields.io/docker/pulls/tanq16/yamanaka.svg" alt="Docker Pulls"></a>
+</p>
+
+<p align="center">
+<b>Yamanaka</b> is a self-hosted synchronization solution for your Obsidian.md vault. Yes, Yamanaka clan from Naruto symbolizing information transfer.
+</p>
 
 > [!IMPORTANT]
 > This repository was entirely prepped by AI. This was by design, as I wanted to test the limits of AI-driven development. While this project pushed those boundaries, the underlying testing and building processes still followed established architectural paradigms. Expand the following to learn more about its creation.
 
 <details>
 <summary>How I Architected This</summary>
-I have a strong preference for Go and enjoy using it for self-hosting applications. While I've manually developed several self-hosted apps, this project was a specific experiment to determine how far I could develop a repository primarily through prompting, with minimal manual effort.
+I like Go and enjoy using it for self-hosted stuff. While I've manually built a couple self-hosted apps, this project was an experiment to determine how far I could get primarily through prompting, with minimal manual effort.
 
-For this project, I leveraged both Google Gemini and Jules. I began by performing a comprehensive 35-40 minute "brain dump" into Gemini, detailing the entire architecture. This included explaining the plugin's core functionality, its use of Server-Sent Events (SSE), and how Git commits were utilized for history preservation.
+I used Google Gemini and Jules for this project. I began with a comprehensive 35-40 minute brain dump into Gemini, detailing the entire architecture and how I thought about the application, core functionality, use of Server-Sent Events (SSE), and Git commits for history preservation.
 
-Following this initial architectural phase, I conducted two "Canvas sessions" with Gemini to initialize the repository and address initial bugs. Subsequently, I completed four distinct tasks with Jules to resolve further issues and integrate additional features.
+Following this, I conducted two Canvas sessions with Gemini to initialize the repository and address initial bugs. Then, I did four tasks with Jules to resolve more issues and add additional features.
 
-The end result was a fully functional and highly effective solution. This approach completely resolved my previous issues with Obsidian Sync, eliminating the need for databases or complex syncing mechanisms. Instead, it relies on simple plaintext syncing, which, thanks to SSE, occurs remarkably quickly. Overall, it was a truly enjoyable and insightful experiment.
+The end result was a fully functional and highly effective solution. This approach completely resolved my issues with syncing on Obsidian, without any databases or complex mechanisms. A simple and fast plaintext syncing, exactly what I eanted. Overall, it was a truly enjoyable and insightful experiment.
 </details>
 
 ---
@@ -24,7 +34,7 @@ Yamanaka is a self-hosted synchronization solution for your Obsidian.md vault. I
 ## Quickstart
 
 *   **Deploy Server:** Use Docker (see `server/Dockerfile`) or run the Go binary directly.
-*   **Install Plugin:** Copy `main.js`, `styles.css`, `manifest.json` from `plugin/` to your vault's `.obsidian/plugins/yamanaka-self-hosted-sync/` directory.
+*   **Install Plugin:** Copy `main.js`, `styles.css`, `manifest.json` from `plugin/` to your vault's `.obsidian/plugins/yamanaka/` directory.
 *   **Configure Plugin:** In Obsidian settings, enable Yamanaka and set your server URL (e.g., `http://your_server_ip:8080`).
 *   **Start Syncing:** Changes will sync automatically.
 
@@ -117,7 +127,7 @@ sequenceDiagram
 
 ## Contributing
 
-(Details TBD)
+As mentioned earlier, this is an AI-experiment repository. That said, since the plugin works properly, contributions are welcome and I will manually review and merge going forward. Please note, unlike most projects, this is meant to be an application that works only for myself, but if someone gets aid from it, that's great. Hence, the MIT license to support freedom. Feature additions, bug fixes, and meaningful contributions are welcome. If you want to discuss, feel free to open an issue and I'll be happy to discuss.
 
 ## License
 

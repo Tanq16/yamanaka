@@ -1,42 +1,43 @@
 # --- Build Stage ---
 # Use an official Golang runtime as a parent image
-FROM golang:1.21-alpine AS builder
+FROM golang:alpine AS builder
 
 # Install git, which is required for the application to run
+# It's included here to ensure all build tools are present
 RUN apk add --no-cache git
 
+# Set the working directory inside the container
 WORKDIR /app
 
 # Copy the Go module files and download dependencies
-# You will need to generate these with `go mod init yamanaka` and `go mod tidy`
-COPY go.mod ./
-COPY go.sum ./
+COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy the source code
+# Copy the rest of the source code
 COPY . .
 
-# Build the Go app
-# -o /server is the output path for the compiled binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /server .
+# Build the Go application, creating a static binary
+# -s and -w flags reduce the size of the binary
+RUN go build -ldflags="-s -w" -o /yamanaka-server .
 
 # --- Final Stage ---
-# Use a minimal base image for the final container
+# Use a minimal alpine image for the final container to keep it small
 FROM alpine:latest
 
-# Add git again, as it's a runtime dependency
+# Install git, which is a runtime dependency for the server
 RUN apk add --no-cache git
 
+# Set the working directory
 WORKDIR /app
 
-# Copy the compiled binary from the builder stage
-COPY --from=builder /server .
+# Create the data directory for the vault storage
+RUN mkdir -p /app/data
 
-# Create the data directory where the vault will be stored
-RUN mkdir data
+# Copy the compiled binary from the builder stage
+COPY --from=builder /yamanaka-server .
 
 # Expose port 8080 to the outside world
 EXPOSE 8080
 
-# Command to run the executable when the container starts
-CMD ["/app/server"]
+# The command to run when the container starts
+CMD ["/app/yamanaka-server"]

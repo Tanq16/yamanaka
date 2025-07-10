@@ -1,10 +1,10 @@
 {
 	"id": "yamanaka-self-hosted-sync",
 	"name": "Yamanaka",
-	"version": "0.1.0",
-	"minAppVersion": "0.15.0",
+	"version": "1.0.0",
+	"minAppVersion": "1.8.0",
 	"description": "Provides self-hosted synchronization capabilities for your Obsidian vault.",
-	"author": "Your Name",
+	"author": "Tanq16",
 	"authorUrl": "https://github.com/tanq16/yamanaka",
 	"fundingUrl": "",
 	"isDesktopOnly": false

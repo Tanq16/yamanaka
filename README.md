@@ -1,12 +1,20 @@
 # Yamanaka - Self-Hosted Obsidian Sync
 
-> This repository is entirely prepped by AI. This was by design, as I wanted to test the limits. However, testing and building follow certain paradigms. Expand the following to know more.
+> [!IMPORTANT]
+> This repository was entirely prepped by AI. This was by design, as I wanted to test the limits of AI-driven development. While this project pushed those boundaries, the underlying testing and building processes still followed established architectural paradigms. Expand the following to learn more about its creation.
 
 <details>
 <summary>How I Architected This</summary>
+I have a strong preference for Go and enjoy using it for self-hosting applications. While I've manually developed several self-hosted apps, this project was a specific experiment to determine how far I could develop a repository primarily through prompting, with minimal manual effort.
 
-I love Go and like to use it with self-hosting. I have more apps I worked on manually for self-hosting, but this was a test to see how far I could take a repo with basically just prompting and minimal efforts. I used Jules and Gemini to create this repo. I started with writing a long braindump of the entire architecture into Gemini, which took me about 35-40 minutes. In the architecture, I explained most of what this plugin is, using SSE and the Git commit for history preservation. Then I followed that with 2 Canvas sessions with Gemini to initialize the repo and fix some bugs. After that, I performed 4 tasks with Jules to fix further issues and add features. At the end, it was usable and worked quite well. This completely fixed my issues with obsidian sync and i didn't need to rely on any db or anything, just plaintext syncing, which also happens quite quickly due to sse. this was a fun experiment.
+For this project, I leveraged both Google Gemini and Jules. I began by performing a comprehensive 35-40 minute "brain dump" into Gemini, detailing the entire architecture. This included explaining the plugin's core functionality, its use of Server-Sent Events (SSE), and how Git commits were utilized for history preservation.
+
+Following this initial architectural phase, I conducted two "Canvas sessions" with Gemini to initialize the repository and address initial bugs. Subsequently, I completed four distinct tasks with Jules to resolve further issues and integrate additional features.
+
+The end result was a fully functional and highly effective solution. This approach completely resolved my previous issues with Obsidian Sync, eliminating the need for databases or complex syncing mechanisms. Instead, it relies on simple plaintext syncing, which, thanks to SSE, occurs remarkably quickly. Overall, it was a truly enjoyable and insightful experiment.
 </details>
+
+---
 
 Yamanaka is a self-hosted synchronization solution for your Obsidian.md vault. It offers:
 *   Real-time, bi-directional sync using Server-Sent Events (SSE).

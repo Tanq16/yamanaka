@@ -14,7 +14,7 @@ type Manager struct {
 }
 
 // FileSystemMutex protects file system operations in the vault.
-var FileSystemMutex = &sync.Mutex{}
+var FileSystemMutex = &sync.RWMutex{}
 
 // NewManager creates a new state manager.
 func NewManager() *Manager {

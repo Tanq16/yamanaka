@@ -9,9 +9,6 @@ RUN apk add --no-cache git
 # Set the working directory inside the container
 WORKDIR /app
 
-# Go download dependencies
-RUN go mod download
-
 # Copy the rest of the source code
 COPY . .
 

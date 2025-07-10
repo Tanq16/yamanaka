@@ -1,6 +1,6 @@
 {
   "name": "yamanaka",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A self-hosted sync plugin for Obsidian.",
   "main": "main.js",
   "scripts": {
@@ -13,7 +13,7 @@
     "sync",
     "self-hosted"
   ],
-  "author": "Your Name",
+  "author": "Tanq16",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^16.11.6",

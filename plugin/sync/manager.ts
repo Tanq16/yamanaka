@@ -67,7 +67,27 @@ export class SyncManager {
                         await this.plugin.app.vault.modifyBinary(localFile, content);
                     }
                 } else {
+                    // Ensure parent directories exist before creating the file
+                    const parentDir = path.substring(0, path.lastIndexOf('/'));
+                    if (parentDir && !this.plugin.app.vault.getAbstractFileByPath(parentDir)) {
+                        try {
+                            console.log(`[Yamanaka] Creating folder during pull: ${parentDir}`);
+                            await this.plugin.app.vault.createFolder(parentDir);
+                        } catch (e) {
+                            // Ignore if folder already exists (race condition or already checked by another process)
+                            if (!e.message?.includes('already exists')) {
+                                console.error(`[Yamanaka] Error creating folder ${parentDir} during pull:`, e);
+                                // Optionally rethrow or handle more gracefully depending on desired behavior
+                                // For now, we log the error and attempt to create the file anyway,
+                                // as createBinary might still succeed or provide a more specific error.
+                            }
+                        }
+                    }
                     console.log(`[Yamanaka] Creating new file: ${path}`);
+                    if (localFile) { // It's a folder or something else, delete it first
+                        console.warn(`[Yamanaka] Path ${path} exists but is not a TFile. Deleting and recreating.`);
+                        await this.plugin.app.vault.delete(localFile, true);
+                    }
                     await this.plugin.app.vault.createBinary(path, content);
                 }
             }

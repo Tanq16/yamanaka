@@ -237,7 +237,7 @@ export default class YamanakaPlugin extends Plugin {
             await this.syncManager.push(this.filesToUpdate, this.filesToDelete);
             this.filesToUpdate.clear();
             this.filesToDelete.clear();
-        }, 3000); // 3-second debounce window
+        }, 100); // 0.1-second debounce window
     }
 
     updateStatusBar(text: string) {

@@ -1,39 +1,55 @@
 # Yamanaka - Self-Hosted Obsidian Sync
 
-Yamanaka is a self-hosted synchronization solution for your Obsidian.md vault. It provides real-time, bi-directional sync across multiple devices, ensuring your notes are always up-to-date. File changes are transmitted instantly between clients using Server-Sent Events (SSE), while the backend server periodically creates Git commits for versioning and backup purposes.
+> This repository is entirely prepped by AI. This was by design, as I wanted to test the limits. However, testing and building follow certain paradigms. Expand the following to know more.
 
-## Features
+<details>
+<summary>How I Architected This</summary>
 
-*   **Real-time Sync:** Changes made on one device are instantly reflected on others via Server-Sent Events.
-*   **Self-Hosted Server:** You control your data. The backend is a Go application that you can run on your own hardware or cloud server.
-*   **Obsidian Plugin:** A companion plugin for Obsidian that handles local file watching, communication with the server, and applying remote changes.
-*   **Periodic Git Commits:** The server automatically commits all changes to a Git repository every 6 hours, providing a version history for your vault.
-*   **Simple Setup:** Uses a Go backend and an Obsidian plugin, with Docker support for easy server deployment.
+I love Go and like to use it with self-hosting. I have more apps I worked on manually for self-hosting, but this was a test to see how far I could take a repo with basically just prompting and minimal efforts. I used Jules and Gemini to create this repo. I started with writing a long braindump of the entire architecture into Gemini, which took me about 35-40 minutes. In the architecture, I explained most of what this plugin is, using SSE and the Git commit for history preservation. Then I followed that with 2 Canvas sessions with Gemini to initialize the repo and fix some bugs. After that, I performed 4 tasks with Jules to fix further issues and add features. At the end, it was usable and worked quite well. This completely fixed my issues with obsidian sync and i didn't need to rely on any db or anything, just plaintext syncing, which also happens quite quickly due to sse. this was a fun experiment.
+</details>
 
-## Architecture
+Yamanaka is a self-hosted synchronization solution for your Obsidian.md vault. It offers:
+*   Real-time, bi-directional sync using Server-Sent Events (SSE).
+*   Instantaneous backend updates and Git commits for versioning on every change.
+*   A Go-based server and an Obsidian plugin.
 
-The system consists of two main components:
+## Quickstart
 
-1. **Backend Server (Go):**
-    * Manages the central vault data on its filesystem.
-    * Initializes a Git repository within its data directory for periodic versioning.
-    * Exposes an HTTP API for:
-        * Pushing/pulling file changes.
-        * Initial vault synchronization.
-        * Serving Server-Sent Events (SSE) for real-time updates.
-    * Handles file operations (create, update, delete) from clients.
-    * Broadcasts granular file change events (path, content for updates/creates, delete notifications) via SSE to all other connected clients.
-    * A background goroutine performs a `git commit` operation every 6 hours. Git is **not** used for direct client-to-client sync determination.
-2. **Obsidian Plugin (TypeScript):**
-    * Installed in each Obsidian vault.
-    * Generates a unique `deviceId`.
-    * Watches the local vault for file changes (creates, modifications, deletions, renames).
-    * Pushes local changes to the server's HTTP API.
-    * Connects to the server's SSE endpoint (`/api/events`) to receive real-time updates about file changes from other clients.
-    * Applies received SSE events (file updates, deletions) to the local vault.
-    * Handles full sync requests when indicated by the server (e.g., after another client performs an initial sync).
+*   **Deploy Server:** Use Docker (see `server/Dockerfile`) or run the Go binary directly.
+*   **Install Plugin:** Copy `main.js`, `styles.css`, `manifest.json` from `plugin/` to your vault's `.obsidian/plugins/yamanaka-self-hosted-sync/` directory.
+*   **Configure Plugin:** In Obsidian settings, enable Yamanaka and set your server URL (e.g., `http://your_server_ip:8080`).
+*   **Start Syncing:** Changes will sync automatically.
 
-### Data Flow for Real-time Sync:
+## Key Features
+
+*   **Instant Sync:** Changes sync immediately across devices using Server-Sent Events (SSE).
+*   **Self-Hosted Server:** Full control over your data with a Go-based backend.
+*   **Obsidian Integration:** Companion plugin for seamless vault synchronization.
+*   **Version History:**
+    *   Server commits changes to Git *instantly* upon receiving them from a client.
+    *   Additionally, a periodic Git commit (every 4 hours by default) ensures any other changes are captured.
+*   **Easy Deployment:** Docker support for server and simple plugin install.
+
+## Architecture Overview
+
+Yamanaka uses a client-server model:
+
+*   **Backend Server (Go):**
+    *   Manages the central vault on its filesystem.
+    *   Uses Git for versioning:
+        *   Commits changes immediately when pushed by a client.
+        *   Performs a periodic commit (default: every 4 hours) as a fallback.
+    *   Provides an HTTP API for:
+        *   File synchronization (push/pull).
+        *   Initial vault setup.
+        *   SSE for real-time updates.
+    *   Broadcasts file changes via SSE to other connected clients.
+*   **Obsidian Plugin (TypeScript):**
+    *   Watches for local file changes (create, modify, delete, rename).
+    *   Pushes these changes to the server.
+    *   Subscribes to server's SSE feed for remote changes and applies them locally.
+
+### Data Flow for Real-time Sync (User Interaction Diagram)
 
 ```mermaid
 sequenceDiagram
@@ -48,6 +64,7 @@ sequenceDiagram
     ObsidianAPI-->>-ClientA: Vault event triggered
     ClientA->>+Server: POST /api/sync/push (path: "note.md", content: base64_data)
     Server->>Server: Writes "note.md" to its filesystem
+    Server->>Server: Commits change to Git
     Server-->>-ClientA: HTTP 200 OK (Push successful)
     Server->>ClientB: SSE Event (event: file_updated, data: {path: "note.md", content: base64_data})
 
@@ -55,88 +72,45 @@ sequenceDiagram
     ObsidianAPI-->>-ClientB: Local vault updated
 ```
 
-### Periodic Git Commit (Server-Side):
-
-```mermaid
-graph TD
-    subgraph Server
-        FS[File System Vault]
-        GIT["Git Repository (.git)"]
-        TICKER[6-Hour Ticker] --> COMMIT_OP[Perform Git Commit]
-        COMMIT_OP --> FS
-        COMMIT_OP --> GIT
-    end
-```
-
-Note: Git operations are independent of plugin operations.
-
 ## Installation
 
 ### 1. Backend Server Setup
 
-**Requirements:**
-*   Go (version 1.21+ recommended) or Docker.
-*   Git installed on the server machine.
-
-**Running with Docker (Recommended):**
-1.  Ensure Docker is installed.
-2.  Navigate to the `server/` directory in the project.
-3.  Build the Docker image:
-    ```bash
-    docker build -t yamanaka-server .
-    ```
-4.  Run the Docker container:
-    ```bash
-    docker run -d -p 8080:8080 -v /path/to/your/desired/vault_storage:/app/data --name yamanaka yamanaka-server
-    ```
-    *   Replace `/path/to/your/desired/vault_storage` with the absolute path on your host machine where you want the server to store the Obsidian vault data (including its Git repository). This directory will be created if it doesn't exist.
-    *   The server will be accessible on `http://<your_server_ip>:8080`.
-
-**Running directly with Go:**
-1.  Clone the repository.
-2.  Navigate to the `server/` directory.
-3.  Ensure Go is installed and configured.
-4.  Build the server:
-    ```bash
-    go build -o yamanaka-server .
-    ```
-5.  Run the server:
-    ```bash
-    ./yamanaka-server
-    ```
-    *   This will create a `data/` subdirectory within the `server/` directory to store the vault.
-    *   The server will run on `http://localhost:8080` by default.
+*   **Requirements:** Go (1.21+), Git.
+*   **Docker (Recommended):**
+    1.  Go to `server/` directory.
+    2.  Build: `docker build -t yamanaka-server .`
+    3.  Run: `docker run -d -p 8080:8080 -v /path/to/your/vault_storage:/app/data --name yamanaka yamanaka-server`
+        *   Replace `/path/to/your/vault_storage` with your desired host path for vault data.
+*   **Directly with Go:**
+    1.  Navigate to `server/`.
+    2.  Build: `go build -o yamanaka-server .`
+    3.  Run: `./yamanaka-server` (data stored in `server/data/`).
 
 ### 2. Obsidian Plugin Setup
 
-1.  Ensure you have Obsidian installed (version 0.15.0 or newer).
-2.  Download the latest release of the Yamanaka plugin from the [releases page](https://github.com/your-repo/yamanaka/releases) (TODO: update link when releases are available).
-    *   Alternatively, if you are developing or want the latest build:
-        *   Clone this repository.
-        *   Navigate to the `plugin/` directory.
-        *   Install dependencies: `npm install`
-        *   Build the plugin: `npm run build`
-        *   This will create a `main.js`, `styles.css`, and `manifest.json` in the `plugin/` directory.
-3.  Copy the plugin files (`main.js`, `styles.css`, `manifest.json`) into your Obsidian vault's plugin folder: `<YourVault>/.obsidian/plugins/yamanaka-self-hosted-sync/`. You might need to create the `yamanaka-self-hosted-sync` directory.
-4.  Open Obsidian, go to `Settings` > `Community plugins`.
-5.  Enable "Yamanaka" in the list of installed plugins.
-6.  Open the Yamanaka plugin settings:
-    *   Enter the **Server URL** (e.g., `http://your_server_ip:8080` or `http://localhost:8080` if running locally).
-    *   Ensure "Auto Sync" is enabled for real-time updates.
-    *   A unique Device ID will be automatically generated.
+1.  Get plugin files (`main.js`, `styles.css`, `manifest.json`):
+    *   Download from releases (TODO: Link).
+    *   Or build from source: `cd plugin/`, `npm install`, `npm run build`.
+2.  Copy to `<YourVault>/.obsidian/plugins/yamanaka-self-hosted-sync/`.
+3.  In Obsidian: `Settings` > `Community plugins` > Enable `Yamanaka`.
+4.  Configure plugin settings:
+    *   **Server URL:** e.g., `http://your_server_ip:8080`.
+    *   Enable **Auto Sync**.
 
 ## Usage
 
-*   **Automatic Sync:** Once configured, the plugin will automatically sync changes in real-time. When you create, modify, or delete files in your Obsidian vault, these changes will be pushed to the server and then broadcast to your other connected devices. Similarly, changes from other devices will be pulled down to your current vault.
-*   **Manual Operations (Commands):**
-    *   **Yamanaka: Manual Push:** Manually pushes any pending local changes to the server.
-    *   **Yamanaka: Manual Pull:** Manually pulls the entire current state of the vault from the server. This is useful if you suspect a discrepancy or after a `full_sync_required` event.
-*   **Initial Sync:** If you are setting up a new device or want to ensure the server has the exact copy of your current local vault, you can use the "Initial Sync" button in the plugin settings (TODO: Verify if this button exists or if manual push from a fresh client achieves this). This action will typically replace the server's current vault content with the content from the client performing the initial sync.
+*   **Automatic Sync:** Enabled by default. File changes are synced in real-time.
+*   **Manual Commands:**
+    *   `Yamanaka: Manual Push`: Push local changes.
+    *   `Yamanaka: Manual Pull`: Fetch entire vault from server.
+*   **Initial Sync:**
+    *   The plugin's "Initial Sync" button (in settings) will replace the server's vault with the current client's vault. Use with caution. (TODO: Confirm button existence/functionality based on latest plugin code).
 
 ## Contributing
 
-(TODO: Add contribution guidelines if desired)
+(Details TBD)
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+[MIT License](LICENSE).

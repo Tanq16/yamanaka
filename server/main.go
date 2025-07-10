@@ -16,7 +16,7 @@ import (
 const (
 	dataDir              = "./data"
 	serverAddr           = ":8080"
-	gitCommitInterval    = 6 * time.Hour
+	gitCommitInterval    = 4 * time.Hour
 	periodicCommitUserID = "server_periodic_commit"
 )
 

@@ -151,6 +151,19 @@ func (h *ApiHandler) PushHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 3. Respond to the client
+	// Commit changes to Git after processing all files and before responding to the client.
+	// This makes the backend changes persistent immediately.
+	commitMsg := fmt.Sprintf("Client push from device %s", deviceID)
+	_, err := vault.CommitChanges(h.VaultPath, commitMsg)
+	if err != nil {
+		// Log the error, but don't fail the entire push operation,
+		// as files are written and SSE events are broadcasted.
+		// The periodic commit will eventually pick up these changes if this one fails.
+		log.Printf("ERROR: PushHandler: Failed to commit changes for device %s: %v", deviceID, err)
+	} else {
+		log.Printf("PushHandler: Changes committed to Git for device %s.", deviceID)
+	}
+
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(SuccessResponse{Status: "success, push processed and changes broadcasted"})
 }

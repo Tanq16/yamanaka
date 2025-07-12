@@ -79,7 +79,7 @@ func main() {
 
 	// --- 2. Initialize State Manager ---
 	// The state manager keeps track of all connected clients for real-time updates (SSE).
-	stateManager := state.NewManager()
+	stateManager := state.NewManager(vaultPath) // Pass vaultPath as the data directory
 	log.Println("State manager initialized.")
 
 	// --- 3. Setup API Handlers ---

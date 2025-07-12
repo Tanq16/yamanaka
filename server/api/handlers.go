@@ -218,6 +218,58 @@ func (h *ApiHandler) EventsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Retrieve and send missed events
+	missedEvents := state.RetrieveAndClearMissedEvents(h.VaultPath, deviceID)
+	if len(missedEvents) > 10 { // Threshold for full sync
+		log.Printf("Client %s has %d missed events, requiring a full sync.", deviceID, len(missedEvents))
+		fullSyncEvent := events.FullSyncEventData{
+			Message: fmt.Sprintf("You have %d missed updates. A full sync is required.", len(missedEvents)),
+		}
+		jsonData, err := json.Marshal(fullSyncEvent)
+		if err != nil {
+			log.Printf("Error marshalling full sync event for %s: %v", deviceID, err)
+		} else {
+			fmt.Fprintf(w, "event: %s\ndata: %s\n\n", events.SSEEventFullSyncRequired, string(jsonData))
+			flusher.Flush()
+		}
+	} else if len(missedEvents) > 0 {
+		log.Printf("Sending %d missed events to client %s", len(missedEvents), deviceID)
+		for _, eventMsg := range missedEvents {
+			var eventName string
+			var jsonData []byte
+			var err error
+
+			switch specificEvent := eventMsg.(type) {
+			case map[string]interface{}: // Unmarshalled from JSON
+				_, pathOk := specificEvent["path"].(string)
+				content, contentOk := specificEvent["content"].(string)
+
+				if pathOk {
+					if contentOk && content != "" {
+						eventName = events.SSEEventFileUpdated
+					} else {
+						eventName = events.SSEEventFileDeleted
+					}
+				} else if _, msgOk := specificEvent["message"]; msgOk {
+					eventName = events.SSEEventFullSyncRequired
+				}
+
+				jsonData, err = json.Marshal(specificEvent)
+
+			default:
+				log.Printf("Unknown type in missed events: %T", eventMsg)
+				continue
+			}
+
+			if err != nil {
+				log.Printf("Error marshalling missed event for %s: %v", deviceID, err)
+				continue
+			}
+			fmt.Fprintf(w, "event: %s\ndata: %s\n\n", eventName, string(jsonData))
+		}
+		flusher.Flush()
+	}
+
 	// Heartbeat ticker
 	heartbeatTicker := time.NewTicker(2 * time.Minute)
 	defer heartbeatTicker.Stop()

@@ -212,4 +212,8 @@ export class ApiClient {
             console.log('[Yamanaka] SSE connection closed.');
         }
     }
+
+    isSseConnected(): boolean {
+        return !!this.eventSource && this.eventSource.readyState === EventSource.OPEN;
+    }
 }

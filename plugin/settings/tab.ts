@@ -55,13 +55,28 @@ export class YamanakaSettingTab extends PluginSettingTab {
             .addButton(button => button
                 .setButtonText('Check Status')
                 .onClick(async () => {
-                    const res = await this.plugin.syncManager.check();
-                    if (res.status === 'uptodate') {
-                        new Notice('Vault is up-to-date.');
-                    } else if (res.status === 'new_changes') {
-                        new Notice(`New changes available on server!`);
+                    try {
+                        // Server check
+                        const res = await this.plugin.apiClient.check(this.plugin.settings.deviceId); // Using apiClient.check directly
+                        let statusMessage = "Yamanaka: Server reachable.";
+                        if (res.status === 'ok') { // Server check successful
+                            // SSE Status Check
+                            if (this.plugin.apiClient.isSseConnected()) {
+                                statusMessage = "Yamanaka Active. Real-time sync connected.";
+                            } else {
+                                statusMessage = "Yamanaka Active. Real-time sync DISCONNECTED. Try toggling Auto-Sync or reloading the plugin.";
+                            }
+                        } else {
+                            // This case should ideally be caught by the catch block if apiClient.check throws an error for non-ok server responses.
+                            // If res.status can be other than 'ok' without throwing, this handles it.
+                            statusMessage = `Yamanaka: Server check returned status: ${res.status}.`;
+                        }
+                        new Notice(statusMessage);
+                    } catch (error) {
+                        console.error("[Yamanaka] Check Server Status error:", error);
+                        new Notice(`Yamanaka: Failed to connect to server. ${error.message}`);
                     }
-                    this.updateStatus();
+                    this.updateStatus(); // Update any persistent status display if needed
                 }));
 
         new Setting(containerEl)
@@ -69,10 +84,11 @@ export class YamanakaSettingTab extends PluginSettingTab {
             .setDesc('DANGER: Overwrites local changes with the version from the server.')
             .addButton(button => button
                 .setButtonText('Pull From Server')
-                .setWarning()
+                // .setWarning() // Removed to use custom styling
+                .setClass('yamanaka-custom-warning-yellow')
                 .onClick(async () => {
                     if (confirm('Are you sure? This will overwrite any local files that differ from the server.')) {
-                        await this.plugin.syncManager.pull();
+                        await this.plugin.syncManager.pull(false); // false for isAutoSync to show notices
                         this.updateStatus();
                     }
                 }));
@@ -83,7 +99,19 @@ export class YamanakaSettingTab extends PluginSettingTab {
             .addButton(button => button
                 .setButtonText('Push to Server')
                 .onClick(async () => {
-                    new Notice("This action is not yet implemented. Pushing happens automatically on file changes.");
+                    // Assuming manual push should show notifications.
+                    // Gather current files to push, similar to how triggerDebouncedPush would before calling syncManager.push
+                    // This requires access to filesToUpdate and filesToDelete from the plugin instance.
+                    // For simplicity, let's use the existing command which already handles this.
+                    // Or, if we want a dedicated button action here:
+                    if (this.plugin.filesToUpdate.size === 0 && this.plugin.filesToDelete.size === 0) {
+                        new Notice("No local changes to push.");
+                        return;
+                    }
+                    new Notice(`Pushing ${this.plugin.filesToUpdate.size} updates and ${this.plugin.filesToDelete.size} deletions...`);
+                    await this.plugin.syncManager.push(this.plugin.filesToUpdate, this.plugin.filesToDelete, false); // false for isAutoSync
+                    this.plugin.filesToUpdate.clear(); // Clear after push
+                    this.plugin.filesToDelete.clear(); // Clear after push
                     this.updateStatus();
                 }));
 
@@ -92,10 +120,11 @@ export class YamanakaSettingTab extends PluginSettingTab {
             .setDesc('DANGER: Wipes the server and replaces its content with your current vault.')
             .addButton(button => button
                 .setButtonText('Perform Initial Sync')
-                .setWarning()
+                // .setWarning() // Removed to use custom styling
+                .setClass('yamanaka-custom-warning-yellow')
                 .onClick(async () => {
                      if (confirm('DANGER! Are you sure you want to wipe the server\'s vault and replace it with this one? This should only be done once from your main device.')) {
-                        await this.plugin.syncManager.initialSync();
+                        await this.plugin.syncManager.initialSync(); // initialSync doesn't have isAutoSync, its notices are always shown.
                         this.updateStatus();
                     }
                 }));
@@ -103,8 +132,8 @@ export class YamanakaSettingTab extends PluginSettingTab {
 
     public updateStatus(): void {
         if (this.statusEl) {
-            const hash = this.plugin.settings.lastSyncHash;
-            this.statusEl.setText(`Device ID: ${this.plugin.settings.deviceId} | Last Sync Hash: ${hash ? hash.substring(0, 7) : 'none'}`);
+            // const hash = this.plugin.settings.lastSyncHash; // Removed
+            this.statusEl.setText(`Device ID: ${this.plugin.settings.deviceId}`); // Removed Last Sync Hash
         }
     }
 }

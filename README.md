@@ -105,6 +105,25 @@ sequenceDiagram
     2.  Build: `go build -o yamanaka-server .`
     3.  Run: `./yamanaka-server` (data stored in `server/data/`).
 
+*   **Docker Compose (Alternative):**
+    If you prefer using Docker Compose, you can use the following `docker-compose.yml` template:
+    ```yaml
+    services:
+      yamanaka:
+        image: tanq16/yamanaka:latest
+        volumes:
+          - /home/tanq/obsidiansync:/app/data # IMPORTANT: Change this to your desired host path for vault data
+        container_name: yamanaka
+        networks:
+          - proxy-net # Optional: If you use a reverse proxy network like nginx-proxy-manager
+        # ports: # Uncomment and adjust if not using a reverse proxy that handles ports
+        #   - "8080:8080"
+    networks:
+      proxy-net: # Optional: Define if you are using it above
+        external: true
+    ```
+    Save this as `docker-compose.yml` and run `docker-compose up -d`. Remember to adjust the volume path.
+
 ### 2. Obsidian Plugin Setup
 
 1.  Get plugin files (`main.js`, `styles.css`, `manifest.json`):

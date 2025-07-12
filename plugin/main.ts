@@ -7,14 +7,14 @@ import { SyncManager } from './sync/manager';
 interface YamanakaPluginSettings {
 	serverUrl: string;
 	deviceId: string;
-    lastSyncHash: string;
+    // lastSyncHash: string; // Removed
     autoSync: boolean;
 }
 
 const DEFAULT_SETTINGS: YamanakaPluginSettings = {
 	serverUrl: '',
 	deviceId: '',
-    lastSyncHash: '',
+    // lastSyncHash: '', // Removed
     autoSync: true,
 }
 
@@ -147,10 +147,10 @@ export default class YamanakaPlugin extends Plugin {
                 console.log(`[Yamanaka] Creating file via SSE: ${filePath}`);
                 await this.app.vault.createBinary(filePath, contentBuffer);
             }
-            new Notice(`Yamanaka: Synced ${data.path} from server.`);
+            // new Notice(`Yamanaka: Synced ${data.path} from server.`); // Removed for auto-sync
         } catch (error) {
             console.error(`[Yamanaka] Error applying server update for ${data.path}:`, error);
-            new Notice(`Yamanaka: Error syncing ${data.path} from server.`);
+            // new Notice(`Yamanaka: Error syncing ${data.path} from server.`); // Removed for auto-sync
         } finally {
             this.isApplyingServerChange = false;
         }
@@ -169,13 +169,13 @@ export default class YamanakaPlugin extends Plugin {
             if (file) {
                 console.log(`[Yamanaka] Deleting file via SSE: ${filePath}`);
                 await this.app.vault.delete(file, true); // true for recursive delete if it's a folder by mistake
-                new Notice(`Yamanaka: Deleted ${data.path} as per server change.`);
+                // new Notice(`Yamanaka: Deleted ${data.path} as per server change.`); // Removed for auto-sync
             } else {
                 console.log(`[Yamanaka] File ${filePath} to delete not found locally.`);
             }
         } catch (error) {
             console.error(`[Yamanaka] Error applying server delete for ${data.path}:`, error);
-            new Notice(`Yamanaka: Error deleting ${data.path} as per server.`);
+            // new Notice(`Yamanaka: Error deleting ${data.path} as per server.`); // Removed for auto-sync
         } finally {
             this.isApplyingServerChange = false;
         }
@@ -185,7 +185,7 @@ export default class YamanakaPlugin extends Plugin {
         console.log(`[Yamanaka] SSE: Received full_sync_required event: ${data.message}. Initiating pull.`);
         // Notice removed from here, as syncManager.pull() will provide its own notices
         // regarding the success or failure of the pull operation.
-        this.syncManager.pull(); // This will pull all files
+        this.syncManager.pull(true); // This will pull all files, true for isAutoSync
     }
 
     registerVaultEvents() {
@@ -234,10 +234,10 @@ export default class YamanakaPlugin extends Plugin {
         }
         this.updateStatusBar('Changes pending...');
         this.debounceTimer = setTimeout(async () => {
-            await this.syncManager.push(this.filesToUpdate, this.filesToDelete);
+            await this.syncManager.push(this.filesToUpdate, this.filesToDelete, true); // true for isAutoSync
             this.filesToUpdate.clear();
             this.filesToDelete.clear();
-        }, 100); // 0.1-second debounce window
+        }, 5000); // 5-second debounce window
     }
 
     updateStatusBar(text: string) {

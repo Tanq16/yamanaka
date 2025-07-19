@@ -21,7 +21,7 @@ const (
 )
 
 // startPeriodicGitCommits starts a goroutine that periodically commits changes in the vault.
-func startPeriodicGitCommits(vaultPath string, sm *state.Manager) {
+func startPeriodicGitCommits(vaultPath string) {
 	log.Printf("Starting periodic Git committer. Interval: %v", gitCommitInterval)
 	ticker := time.NewTicker(gitCommitInterval)
 	go func() {
@@ -88,7 +88,7 @@ func main() {
 	apiHandler := api.NewApiHandler(stateManager, vaultPath)
 
 	// --- 3a. Start Periodic Git Commits ---
-	startPeriodicGitCommits(vaultPath, stateManager)
+	startPeriodicGitCommits(vaultPath)
 
 	// --- 4. Define HTTP Routes ---
 	mux := http.NewServeMux()

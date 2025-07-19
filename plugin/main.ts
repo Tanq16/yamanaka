@@ -26,8 +26,8 @@ export default class YamanakaPlugin extends Plugin {
     statusBar: HTMLElement;
 
     private debounceTimer: NodeJS.Timeout | null = null;
-    private filesToUpdate: Set<string> = new Set();
-    private filesToDelete: Set<string> = new Set();
+    public filesToUpdate: Set<string> = new Set();
+    public filesToDelete: Set<string> = new Set();
     private isApplyingServerChange: boolean = false; // Flag to prevent SSE changes from re-triggering push
 
 	async onload() {

@@ -35,15 +35,12 @@ jobs:
             exit 0
           fi
 
-          echo "Commits since last tag:"
-          echo "$commits_since_tag"
-
-          # Determine the type of version bump based on Conventional Commits
-          bump="patch" # Default bump is patch
-          if echo "$commits_since_tag" | grep -q "feat:"; then
+          # Determine the type of version bump based on Conventional Commits, Default: bump
+          bump="patch"
+          if echo "$commits_since_tag" | grep -q "minor bump"; then
             bump="minor"
           fi
-          if echo "$commits_since_tag" | grep -q "BREAKING CHANGE"; then
+          if echo "$commits_since_tag" | grep -q "major bump"; then
             bump="major"
           fi
           echo "Determined version bump: $bump"
@@ -113,8 +110,9 @@ jobs:
         if: steps.version_check.outputs.should_release == 'true'
         run: |
           VERSION=${{ steps.version_check.outputs.version }}
-          LDFLAGS="-X 'main.version=v$VERSION'"
-          GOOS=linux GOARCH=amd64 go build -ldflags="$LDFLAGS" -o release-assets/yamanaka-server ./server
+          LDFLAGS="-s -w -X 'main.version=v$VERSION'"
+          cd server
+          GOOS=linux GOARCH=amd64 go build -ldflags="$LDFLAGS" -o release-assets/yamanaka-server
 
       - name: Package plugin for release
         if: steps.version_check.outputs.should_release == 'true'
@@ -130,6 +128,5 @@ jobs:
         if: steps.version_check.outputs.should_release == 'true'
         uses: softprops/action-gh-release@v1
         with:
-          # This action will create the release and the tag from the 'tag_name' field.
           tag_name: ${{ steps.version_check.outputs.new_tag }}
           files: release-assets/*

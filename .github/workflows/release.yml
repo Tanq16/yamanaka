@@ -2,135 +2,134 @@ name: Release
 
 on:
   push:
-    branches: [ main ]
-
-permissions:
-  contents: write
-  packages: write
+    branches:
+      - main
 
 jobs:
-  process-commit:
+  release:
+    name: Bump Version and Release
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.new_version }}
-      release_created: ${{ steps.create_release.outputs.release_created }}
+    permissions:
+      contents: write
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out code
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      - name: Determine Version
-        id: version
+      - name: Determine Version and Check for Changes
+        id: version_check
         run: |
-          # Get the latest version tag
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.0")
-          
-          # Extract current version numbers
-          VERSION_PARTS=(${LATEST_TAG//./ })
-          MAJOR=${VERSION_PARTS[0]#v}
-          MINOR=${VERSION_PARTS[1]}
-          PATCH=${VERSION_PARTS[2]:-0}
-          
-          # Check commit message for version increments
-          if git log -1 --pretty=%B | grep -i "version bump"; then
-            NEW_VERSION="v$((MAJOR + 1)).0"
-          elif git log -1 --pretty=%B | grep -i "minor bump"; then
-            NEW_VERSION="v$MAJOR.$((MINOR + 1)).0"
-          elif git log -1 --pretty=%B | grep -i "patch bump"; then
-            NEW_VERSION="v$MAJOR.$MINOR.$((PATCH + 1))"
-          else
-            NEW_VERSION="v$MAJOR.$MINOR.$((PATCH + 1))"
+          # Get the latest tag from the repository
+          latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag is: $latest_tag"
+
+          # Get all commit messages since the last tag
+          commits_since_tag=$(git log ${latest_tag}..HEAD --oneline)
+
+          # If there are no new commits, there's nothing to release.
+          if [ -z "$commits_since_tag" ]; then
+            echo "No new commits since last tag. No release needed."
+            echo "should_release=false" >> $GITHUB_OUTPUT
+            exit 0
           fi
-          
-          echo "Previous version: $LATEST_TAG\n New version: $NEW_VERSION"
-          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
-        env:
-          GH_TOKEN: ${{ github.token }}
 
-      - name: Create Release
-        id: create_release
-        run: |
-          gh release create "${{ steps.version.outputs.new_version }}" \
-            --title "Release ${{ steps.version.outputs.new_version }}" --draft \
-            --notes "Yamanaka Server - Latest (Version: ${{ steps.version.outputs.new_version }})" \
-            --target ${{ github.sha }}
-          echo "release_created=true" >> "$GITHUB_OUTPUT"
-        env:
-          GH_TOKEN: ${{ github.token }}
+          echo "Commits since last tag:"
+          echo "$commits_since_tag"
 
-  build-server:
-    needs: process-commit
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        os: [linux, windows, darwin]
-        arch: [amd64, arm64]
-    steps:
-      - uses: actions/checkout@v4
+          # Determine the type of version bump based on Conventional Commits
+          bump="patch" # Default bump is patch
+          if echo "$commits_since_tag" | grep -q "feat:"; then
+            bump="minor"
+          fi
+          if echo "$commits_since_tag" | grep -q "BREAKING CHANGE"; then
+            bump="major"
+          fi
+          echo "Determined version bump: $bump"
+
+          # Use bash to increment the version number
+          IFS='.' read -r -a version_parts <<< "${latest_tag#v}"
+          major=${version_parts[0]}
+          minor=${version_parts[1]}
+          patch=${version_parts[2]}
+
+          case "$bump" in
+            "major")
+              major=$((major + 1)); minor=0; patch=0
+              ;;
+            "minor")
+              minor=$((minor + 1)); patch=0
+              ;;
+            "patch")
+              patch=$((patch + 1))
+              ;;
+          esac
+
+          new_version_tag="v${major}.${minor}.${patch}"
+          echo "New version tag will be: $new_version_tag"
+
+          # Set outputs for subsequent steps
+          echo "should_release=true" >> $GITHUB_OUTPUT
+          echo "new_tag=$new_version_tag" >> $GITHUB_OUTPUT
+          echo "version=${new_version_tag#v}" >> $GITHUB_OUTPUT
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        if: steps.version_check.outputs.should_release == 'true'
+        uses: actions/setup-go@v3
         with:
           go-version: '1.21'
 
-      - name: Build Server Binary
-        run: |
-            cd server
-            GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags="-s -w" -o "yamanaka-server${{ matrix.os == 'windows' && '.exe' || '' }}" .
-            zip -r ../yamanaka-server-${{ matrix.os }}-${{ matrix.arch }}.zip yamanaka-server*
-      
-      - name: Upload Release Asset
-        run: |
-          gh release upload "${{ needs.process-commit.outputs.version }}" "yamanaka-server-${{ matrix.os }}-${{ matrix.arch }}.zip" --clobber
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-  publish-docker:
-    needs: process-commit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
+      - name: Set up Node.js
+        if: steps.version_check.outputs.should_release == 'true'
+        uses: actions/setup-node@v3
         with:
-          username: tanq16
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: plugin/package-lock.json
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+      - name: Update plugin version files
+        if: steps.version_check.outputs.should_release == 'true'
+        run: |
+          VERSION=${{ steps.version_check.outputs.version }}
+          echo "Updating plugin JSON files to version $VERSION"
+          jq --arg v "$VERSION" '.version = $v' plugin/manifest.json > tmp.json && mv tmp.json plugin/manifest.json
+          jq --arg v "$VERSION" '.version = $v' plugin/package.json > tmp.json && mv tmp.json plugin/package.json
+          echo "Updated manifest.json:"
+          cat plugin/manifest.json
+
+      - name: Build Obsidian plugin
+        if: steps.version_check.outputs.should_release == 'true'
+        working-directory: ./plugin
+        run: |
+          npm install
+          npm run build
+
+      - name: Set up build directory
+        if: steps.version_check.outputs.should_release == 'true'
+        run: mkdir -p release-assets
+
+      - name: Build server binaries for multiple platforms
+        if: steps.version_check.outputs.should_release == 'true'
+        run: |
+          VERSION=${{ steps.version_check.outputs.version }}
+          LDFLAGS="-X 'main.version=v$VERSION'"
+          GOOS=linux GOARCH=amd64 go build -ldflags="$LDFLAGS" -o release-assets/yamanaka-server ./server
+
+      - name: Package plugin for release
+        if: steps.version_check.outputs.should_release == 'true'
+        run: |
+          VERSION=${{ steps.version_check.outputs.version }}
+          mkdir -p release-assets/yamanaka
+          cp plugin/main.js release-assets/yamanaka/
+          cp plugin/styles.css release-assets/yamanaka/
+          cp plugin/manifest.json release-assets/yamanaka/
+          (cd release-assets && zip -r yamanaka-plugin-v$VERSION.zip yamanaka)
+
+      - name: Create Git Tag and GitHub Release
+        if: steps.version_check.outputs.should_release == 'true'
+        uses: softprops/action-gh-release@v1
         with:
-          context: ./server
-          file: ./server/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: tanq16/yamanaka:latest,tanq16/yamanaka:${{ needs.process-commit.outputs.version }}
-
-  publish-release:
-    needs: [process-commit, build-server, publish-docker]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Publish Release
-        run: |
-          gh release edit "${{ needs.process-commit.outputs.version }}" --draft=false
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-  cleanup-on-failure:
-    needs: [process-commit, build-server, publish-docker, publish-release]
-    if: failure() && needs.process-commit.outputs.release_created == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Delete Draft Release
-        run: |
-          echo "Cleaning up draft release due to workflow failure"
-          gh release delete "${{ needs.process-commit.outputs.version }}" --yes
-        env:
-          GH_TOKEN: ${{ github.token }}
+          # This action will create the release and the tag from the 'tag_name' field.
+          tag_name: ${{ steps.version_check.outputs.new_tag }}
+          files: release-assets/*

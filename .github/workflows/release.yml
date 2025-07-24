@@ -21,21 +21,17 @@ jobs:
       - name: Determine Version and Check for Changes
         id: version_check
         run: |
-          # Get the latest tag from the repository
           latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "Latest tag is: $latest_tag"
-
-          # Get all commit messages since the last tag
           commits_since_tag=$(git log ${latest_tag}..HEAD --oneline)
 
-          # If there are no new commits, there's nothing to release.
           if [ -z "$commits_since_tag" ]; then
             echo "No new commits since last tag. No release needed."
             echo "should_release=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # Determine the type of version bump based on Conventional Commits, Default: bump
+          # Determine the type of version bump based on Conventional Commits, Default: patch
           bump="patch"
           if echo "$commits_since_tag" | grep -q "minor bump"; then
             bump="minor"
@@ -45,7 +41,7 @@ jobs:
           fi
           echo "Determined version bump: $bump"
 
-          # Use bash to increment the version number
+          # Increment the version number
           IFS='.' read -r -a version_parts <<< "${latest_tag#v}"
           major=${version_parts[0]}
           minor=${version_parts[1]}

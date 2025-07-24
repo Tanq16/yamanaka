@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,118 +16,77 @@ import (
 const (
 	dataDir              = "./data"
 	serverAddr           = ":8080"
-	gitCommitInterval    = 4 * time.Hour
+	gitCommitInterval    = 6 * time.Hour
 	periodicCommitUserID = "server_periodic_commit"
 )
 
-// startPeriodicGitCommits starts a goroutine that periodically commits changes in the vault.
+// goroutine to periodically commit changes in the vault
 func startPeriodicGitCommits(vaultPath string) {
-	log.Printf("Starting periodic Git committer. Interval: %v", gitCommitInterval)
+	slog.Info("git-goroutine: started", "interval", gitCommitInterval)
 	ticker := time.NewTicker(gitCommitInterval)
 	go func() {
 		for range ticker.C {
-			log.Println("Periodic Git committer: Attempting to commit changes...")
-			commitMsg := "Automatic periodic server commit"
+			commitMsg := "Yamanaka git sync"
 			newHash, err := vault.CommitChanges(vaultPath, commitMsg)
 			if err != nil {
-				log.Printf("ERROR: Periodic Git committer: Failed to commit changes: %v", err)
-				continue // Continue to next tick
+				slog.Error("git-goroutine: failed to commit changes", "error", err)
+				continue
 			}
-
-			// Check if the hash actually changed (i.e., if there were any new changes)
-			// We need a way to get the hash *before* this commit attempt to compare.
-			// For simplicity, CommitChanges now returns the current hash even if nothing was committed.
-			// So, we broadcast only if the process of committing (even if it results in the same hash) is considered an event.
-			// Or, more robustly, CommitChanges could return a boolean indicating if a *new* commit was actually made.
-			// For now, we'll assume any call to CommitChanges that doesn't error should result in a broadcast,
-			// as it represents a "settling" of the state.
-
-			// It's important that CommitChanges itself is wrapped in the FileSystemMutex.
-			// And GetCurrentHash is also wrapped if it reads from disk in a way that could race.
-			// GetCurrentHash currently uses git rev-parse HEAD, which should be safe.
-
-			log.Printf("Periodic Git committer: Changes committed. New hash: %s", newHash)
-			// sm.Broadcast(periodicCommitUserID, newHash) // DO NOT broadcast git hash to clients anymore. This is purely a backend operation.
-			// If we need to notify admins or a different system, use a separate mechanism.
+			slog.Info("git-goroutine: changes committed", "hash", newHash)
 		}
 	}()
 }
 
 func main() {
-	log.Println("Starting Yamanaka Sync Server...")
-
-	// --- 1. Setup Vault Directory ---
-	// The vault directory is where all the notes and the git repository are stored.
-	vaultPath, err := filepath.Abs(dataDir)
-	if err != nil {
-		log.Fatalf("FATAL: Could not determine absolute path for data directory: %v", err)
-	}
-
-	// Create the data directory if it doesn't exist.
+	vaultPath, _ := filepath.Abs(dataDir)
 	if _, err := os.Stat(vaultPath); os.IsNotExist(err) {
-		log.Printf("Data directory not found. Creating at %s", vaultPath)
+		slog.Info("data directory not found, creating", "vault path", vaultPath)
 		if err := os.MkdirAll(vaultPath, 0755); err != nil {
-			log.Fatalf("FATAL: Could not create data directory: %v", err)
+			slog.Error("could not create data directory", "error", err)
+			os.Exit(1)
 		}
 	}
-
-	// Initialize the git repository if it's not already there.
 	if err := vault.InitRepo(vaultPath); err != nil {
-		log.Fatalf("FATAL: Could not initialize git repository: %v", err)
+		slog.Error("could not initialize git", "error", err)
 	}
-	log.Printf("Vault is ready at %s", vaultPath)
+	slog.Info("vault ready")
 
-	// --- 2. Initialize State Manager ---
-	// The state manager keeps track of all connected clients for real-time updates (SSE).
-	stateManager := state.NewManager(vaultPath) // Pass vaultPath as the data directory
-	log.Println("State manager initialized.")
-
-	// --- 3. Setup API Handlers ---
-	// We create an ApiHandler struct to provide dependencies (like the state manager and vault path)
-	// to our HTTP handler functions. This is a form of dependency injection.
+	stateManager := state.NewManager(vaultPath)
+	slog.Info("state manager initialized")
 	apiHandler := api.NewApiHandler(stateManager, vaultPath)
-
-	// --- 3a. Start Periodic Git Commits ---
 	startPeriodicGitCommits(vaultPath)
 
-	// --- 4. Define HTTP Routes ---
+	// http routes
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/check", apiHandler.CheckHandler)
 	mux.HandleFunc("/api/sync/initial", apiHandler.InitialSyncHandler)
 	mux.HandleFunc("/api/sync/push", apiHandler.PushHandler)
 	mux.HandleFunc("/api/sync/pull", apiHandler.PullHandler)
 	mux.HandleFunc("/api/events", apiHandler.EventsHandler)
-
-	// Simple root handler for health checks
+	// simple root handler for health checks
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Yamanaka Sync Server is running."))
 	})
 
-	// --- 5. Start Server ---
-	log.Printf("Server starting on %s", serverAddr)
-	// Wrap the mux with CORS middleware
+	slog.Info("starting server", "address", serverAddr)
 	corsMux := corsMiddleware(mux)
 	if err := http.ListenAndServe(serverAddr, corsMux); err != nil {
-		log.Fatalf("FATAL: Could not start server: %v", err)
+		slog.Error("could not start server", "error", err)
+		os.Exit(1)
 	}
 }
 
-// corsMiddleware wraps an http.Handler with CORS headers
+// wraps an http.Handler with CORS headers
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Set CORS headers
-		w.Header().Set("Access-Control-Allow-Origin", "app://obsidian.md") // Or "*" for testing, but be specific in production
+		w.Header().Set("Access-Control-Allow-Origin", "app://obsidian.md")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Requested-With, Origin, Accept, Authorization") // Added Authorization
-
-		// Handle preflight requests
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Requested-With, Origin, Accept, Authorization")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-
-		// Call the next handler
 		next.ServeHTTP(w, r)
 	})
 }
